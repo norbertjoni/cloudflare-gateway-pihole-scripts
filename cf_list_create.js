@@ -15,31 +15,14 @@ let whitelist = []; // Define an empty array for the whitelist
 fs.readFile('whitelist.csv', 'utf8', async (err, data) => {
   if (err) {
     console.warn('Error reading whitelist.csv:', err);
-    console.warn('Assuming whitelist is empty.')
+    console.warn('Assuming whitelist is empty.');
   } else {
-    // Convert into array and cleanup whitelist
-    const domainValidationPattern = /^(?!-)[A-Za-z0-9-]+([\-\.]{1}[a-z0-9]+)*\.[A-Za-z]{2,6}$/;
     whitelist = data.split('\n').filter(domain => {
-      // Remove entire lines starting with "127.0.0.1" or "::1", empty lines or comments
-      return domain && !domain.startsWith('#') && !domain.startsWith('//') && !domain.startsWith('/*') && !domain.startsWith('*/') && !(domain === '\r');
-    }).map(domain => {
-      // Remove "\r", "0.0.0.0 ", "127.0.0.1 ", "::1 " and similar from domain items
-      return domain
-        .replace('\r', '')
-        .replace('0.0.0.0 ', '')
-        .replace('127.0.0.1 ', '')
-        .replace('::1 ', '')
-        .replace(':: ', '')
-        .replace('||', '')
-        .replace('@@||', '')
-        .replace('^$important', '')
-        .replace('*.', '')
-        .replace('^', '');
-    }).filter(domain => {
-      return domainValidationPattern.test(domain);
+      // Remove empty lines and lines starting with "#"
+      return domain.trim() !== '' && !domain.startsWith('#');
     });
     console.log(`Found ${whitelist.length} valid domains in whitelist.`);
-  }  
+  }
 });
 
 
@@ -50,27 +33,9 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
     return;
   }
 
-  // Convert into array and cleanup input
-  const domainValidationPattern = /^(?!-)[A-Za-z0-9-]+([\-\.]{1}[a-z0-9]+)*\.[A-Za-z]{2,6}$/;
   let domains = data.split('\n').filter(domain => {
-    // Remove entire lines starting with "127.0.0.1" or "::1", empty lines or comments
-    return domain && !domain.startsWith('#') && !domain.startsWith('//') && !domain.startsWith('/*') && !domain.startsWith('*/') && !(domain === '\r');
-  }).map(domain => {
-    // Remove "\r", "0.0.0.0 ", "127.0.0.1 ", "::1 " and similar from domain items
-    return domain
-      .replace('\r', '')
-      .replace('0.0.0.0 ', '')
-      .replace('127.0.0.1 ', '')
-      .replace('::1 ', '')
-      .replace(':: ', '')
-      .replace('^', '')
-      .replace('||', '')
-      .replace('@@||', '')
-      .replace('^$important', '')
-      .replace('*.', '')
-      .replace('^', '');
-  }).filter(domain => {
-    return domainValidationPattern.test(domain);
+    // Remove empty lines and lines starting with "#"
+    return domain.trim() !== '' && !domain.startsWith('#');
   });
 
   // Check for duplicates in domains array
@@ -102,7 +67,6 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
     domains = trimArray(domains, LIST_ITEM_LIMIT);
     console.warn(`More than ${LIST_ITEM_LIMIT} domains found in input.csv - input has to be trimmed`);
   }
-
   const listsToCreate = Math.ceil(domains.length / 1000);
 
   if (!process.env.CI) console.log(`Found ${domains.length} valid domains in input.csv after cleanup - ${listsToCreate} list(s) will be created`);
