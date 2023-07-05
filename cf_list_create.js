@@ -9,7 +9,7 @@ const LIST_ITEM_LIMIT = Number.isSafeInteger(Number(process.env.CLOUDFLARE_LIST_
 
 if (!process.env.CI) console.log(`List item limit set to ${LIST_ITEM_LIMIT}`);
 
-let whitelist = [];
+let whitelist = []; // Define an empty array for the whitelist
 
 // Read whitelist.csv and parse
 fs.readFile('whitelist.csv', 'utf8', async (err, data) => {
@@ -73,6 +73,43 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
   // Separate domains into chunks of 1000 (Cloudflare list cap)
   const chunks = chunkArray(domains, 1000);
 
+  // Function to create a Cloudflare Zero Trust list
+  async function createZeroTrustList(name, items, currentItem, totalItems) {
+    const response = await axios.post(
+      `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
+      {
+        name,
+        type: 'DOMAIN', // Set list type to DOMAIN
+        items,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-Auth-Email': ACCOUNT_EMAIL,
+          'X-Auth-Key': API_TOKEN,
+        },
+      }
+    );
+
+    const listId = response.data.result.id;
+    console.log(`Created Zero Trust list`, process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left`);
+  }
+
+  // Function to sleep for a specified duration
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Function to split an array into chunks
+  function chunkArray(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
   // Create Cloudflare Zero Trust lists
   for (const [index, chunk] of chunks.entries()) {
     const listName = `CGPS List - Chunk ${index}`;
@@ -92,53 +129,7 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
   }
 });
 
+// Function to trim an array to a specified size
 function trimArray(arr, size) {
   return arr.slice(0, size);
-}
-
-// Function to check if a domain is valid
-function isValidDomain(domain) {
-  const regex = /^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$/;
-  return regex.test(domain);
-}
-
-// Function to split an array into chunks
-function chunkArray(array, chunkSize) {
-  const chunks = [];
-  for (let i = 0; i < array.length; i += chunkSize) {
-    chunks.push(array.slice(i, i + chunkSize));
-  }
-  return chunks;
-}
-
-// Function to create a Cloudflare Zero Trust list
-async function createZeroTrustList(name, items, currentItem, totalItems) {
-  const response = await axios.post(
-    `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
-    {
-      name,
-      type: 'DOMAIN', // Set list type to DOMAIN
-      items,
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Auth-Email': ACCOUNT_EMAIL,
-        'X-Auth-Key': API_TOKEN,
-      },
-    }
-  );
-
-  const listId = response.data.result.id;
-  console.log(`Created Zero Trust list`, process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left`);
-}
-
-function percentage(percent, total) {
-  return Math.round((percent / 100) * total);
-}
-
-// Function to sleep for a specified duration
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
