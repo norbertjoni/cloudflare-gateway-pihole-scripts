@@ -87,7 +87,7 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
       await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
       await sleep(350); // Sleep for 350ms between list additions
     } catch (error) {
-      console.error(`Error creating list `, process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`);
+      console.error(`Error creating list `, process.env.CI ? "(redacted on CI)" : `"${listName}":`, error.response.data);
     }
   }
 });
