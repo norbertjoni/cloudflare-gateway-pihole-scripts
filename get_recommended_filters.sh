@@ -13,6 +13,7 @@ urls=(
   # https://adaway.org/hosts.txt
   # https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
   https://big.oisd.nl/regex
+  
 )
 
 # loop through the urls and download each file with curl
