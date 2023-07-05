@@ -71,39 +71,29 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
 
   if (!process.env.CI) console.log(`Found ${domains.length} valid domains in input.csv after cleanup - ${listsToCreate} list(s) will be created`);
 
-  // Separate domains into chunks of 1000 (Cloudflare list cap)
-  const chunks = chunkArray(domains, 1000);
-
   // Create Cloudflare Zero Trust lists
-  for (const [index, chunk] of chunks.entries()) {
+  for (let index = 0; index < listsToCreate; index++) {
     const listName = `CGPS List - Chunk ${index}`;
 
-    let properList = [];
+    const start = index * 1000;
+    const end = start + 1000;
+    const chunk = domains.slice(start, end);
 
-    chunk.forEach(domain => {
-        properList.push({ "value": domain })
+    let properList = chunk.map(domain => {
+      return { value: domain };
     });
 
     try {
-      await createZeroTrustList(listName, properList, (index+1), listsToCreate);
+      await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
       await sleep(350); // Sleep for 350ms between list additions
     } catch (error) {
-      console.error(`Error creating list `, process.env.CI ? "(redacted on CI)" :  `"${listName}": ${error.response.data}`);
+      console.error(`Error creating list `, process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`);
     }
   }
 });
 
 function trimArray(arr, size) {
   return arr.slice(0, size);
-}
-
-// Function to split an array into chunks
-function chunkArray(array, chunkSize) {
-  const chunks = [];
-  for (let i = 0; i < array.length; i += chunkSize) {
-    chunks.push(array.slice(i, i + chunkSize));
-  }
-  return chunks;
 }
 
 // Function to create a Cloudflare Zero Trust list
