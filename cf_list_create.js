@@ -79,7 +79,7 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
     const end = start + 1000;
     const chunk = domains.slice(start, end);
 
-    let properList = chunk.map(domain => {
+    const properList = chunk.map(domain => {
       return { value: domain };
     });
 
