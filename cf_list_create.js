@@ -9,7 +9,7 @@ const LIST_ITEM_LIMIT = Number.isSafeInteger(Number(process.env.CLOUDFLARE_LIST_
 
 if (!process.env.CI) console.log(`List item limit set to ${LIST_ITEM_LIMIT}`);
 
-let whitelist = []; // Define an empty array for the whitelist
+let whitelist = [];
 
 // Read whitelist.csv and parse
 fs.readFile('whitelist.csv', 'utf8', async (err, data) => {
@@ -24,7 +24,6 @@ fs.readFile('whitelist.csv', 'utf8', async (err, data) => {
     console.log(`Found ${whitelist.length} valid domains in whitelist.`);
   }
 });
-
 
 // Read input.csv and parse domains
 fs.readFile('input.csv', 'utf8', async (err, data) => {
@@ -81,14 +80,14 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
     let properList = [];
 
     chunk.forEach(domain => {
-        properList.push({ "value": domain })
+      properList.push({ "value": domain });
     });
 
     try {
-      await createZeroTrustList(listName, properList, (index+1), listsToCreate);
+      await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
       await sleep(350); // Sleep for 350ms between list additions
     } catch (error) {
-      console.error(`Error creating list `, process.env.CI ? "(redacted on CI)" :  `"${listName}": ${error.response.data}`);
+      console.error(`Error creating list `, process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`);
     }
   }
 });
@@ -99,8 +98,8 @@ function trimArray(arr, size) {
 
 // Function to check if a domain is valid
 function isValidDomain(domain) {
-    const regex = /^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$/;
-    return regex.test(domain);
+  const regex = /^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$/;
+  return regex.test(domain);
 }
 
 // Function to split an array into chunks
