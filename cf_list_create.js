@@ -29,7 +29,10 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
   for (const [index, chunk] of chunks.entries()) {
     const listName = `CGPS List - Chunk ${index}`;
 
-    let properList = chunk.map(domain => ({ value: domain }));
+    let properList = chunk.map(domain => {
+      const pattern = domain.substring(1, domain.lastIndexOf('/'));
+      return { value: pattern, is_regex: true };
+    });
 
     try {
       await createZeroTrustList(listName, properList, (index+1), listsToCreate);
