@@ -30,8 +30,7 @@ fs.readFile('input.csv', 'utf8', async (err, data) => {
     const listName = `CGPS List - Chunk ${index}`;
 
     let properList = chunk.map(domain => {
-      const pattern = domain.substring(1, domain.lastIndexOf('/'));
-      return { value: pattern, is_regex: true };
+      return { value: domain.substring(1, domain.length - 1), is_regex: true };
     });
 
     try {
