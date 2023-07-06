@@ -32,7 +32,7 @@ async function runScript() {
 
     for (let i = 0; i < chunks.length; i++) {
       const listName = `CGPS List - Chunk ${i}`;
-      const items = chunks[i].map(pattern => ({ pattern }));
+      const items = chunks[i].map(pattern => ({ value: pattern }));
 
       await createZeroTrustList(listName, items, i + 1, chunks.length);
       await sleep(350);
@@ -61,7 +61,7 @@ async function createZeroTrustList(name, items, currentItem, totalItems) {
       `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
       {
         name,
-        type: 'REGEX',
+        type: 'DOMAIN',
         items,
       },
       {
