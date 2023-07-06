@@ -12,43 +12,34 @@ if (!process.env.CI) {
 
 async function runScript() {
   try {
-    // Fetch data from the provided URL
     const response = await axios.get('https://big.oisd.nl/regex');
     const data = response.data;
 
-    // Remove lines starting with "#"
-    let domains = data.split('\n').filter(line => !line.trim().startsWith('#'));
+    const patterns = data
+      .split('\n')
+      .filter(line => !line.trim().startsWith('#'));
 
-    // Trim array to 300,000 domains if it's longer than that
-    if (domains.length > LIST_ITEM_LIMIT) {
-      domains = trimArray(domains, LIST_ITEM_LIMIT);
-      console.warn(`More than ${LIST_ITEM_LIMIT} domains found in input - input has to be trimmed`);
+    if (patterns.length > LIST_ITEM_LIMIT) {
+      patterns.length = LIST_ITEM_LIMIT;
+      console.warn(`More than ${LIST_ITEM_LIMIT} patterns found in input - input has been trimmed`);
     }
-
-    const listsToCreate = Math.ceil(domains.length / 1000);
 
     if (!process.env.CI) {
-      console.log(`Found ${domains.length} valid domains in input - ${listsToCreate} list(s) will be created`);
+      console.log(`Found ${patterns.length} valid patterns in input - creating lists`);
     }
 
-    // Separate domains into chunks of 1000 (Cloudflare list cap)
-    const chunks = chunkArray(domains, 1000);
+    const chunks = chunkArray(patterns, 1000);
 
-    // Create Cloudflare Zero Trust lists
-    for (const [index, chunk] of chunks.entries()) {
-      const listName = `CGPS List - Chunk ${index}`;
+    for (let i = 0; i < chunks.length; i++) {
+      const listName = `CGPS List - Chunk ${i}`;
+      const items = chunks[i].map(pattern => ({ pattern }));
 
-      let properList = chunk.map(domain => ({ value: domain }));
-
-      try {
-        await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
-        await sleep(350); // Sleep for 350ms between list additions
-      } catch (error) {
-        console.error(`Error creating list ${process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`}`);
-      }
+      await createZeroTrustList(listName, items, i + 1, chunks.length);
+      await sleep(350);
     }
   } catch (error) {
     console.error('Error fetching data from the provided URL:', error);
+    process.exit(1);
   }
 }
 
@@ -65,25 +56,29 @@ function chunkArray(array, chunkSize) {
 }
 
 async function createZeroTrustList(name, items, currentItem, totalItems) {
-  const response = await axios.post(
-    `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
-    {
-      name,
-      type: 'DOMAIN',
-      items,
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Auth-Email': ACCOUNT_EMAIL,
-        'X-Auth-Key': API_TOKEN,
+  try {
+    const response = await axios.post(
+      `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
+      {
+        name,
+        type: 'REGEX',
+        items,
       },
-    }
-  );
+      {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-Auth-Email': ACCOUNT_EMAIL,
+          'X-Auth-Key': API_TOKEN,
+        },
+      }
+    );
 
-  const listId = response.data.result.id;
-  console.log(`Created Zero Trust list ${process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left"}`);
+    const listId = response.data.result.id;
+    console.log(`Created Zero Trust list "${name}" with ID ${listId} - ${totalItems - currentItem} left`);
+  } catch (error) {
+    console.error(`Error creating list "${name}":`, error.response.data);
+  }
 }
 
 function sleep(ms) {
