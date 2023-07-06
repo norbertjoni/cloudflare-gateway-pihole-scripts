@@ -10,9 +10,10 @@ if (!process.env.CI) {
   console.log(`List item limit set to ${LIST_ITEM_LIMIT}`);
 }
 
-// Fetch data from the provided URL
-axios.get('https://big.oisd.nl/regex')
-  .then(response => {
+async function runScript() {
+  try {
+    // Fetch data from the provided URL
+    const response = await axios.get('https://big.oisd.nl/regex');
     const data = response.data;
 
     // Remove lines starting with "#"
@@ -39,16 +40,17 @@ axios.get('https://big.oisd.nl/regex')
 
       let properList = chunk.map(domain => ({ value: domain }));
 
-      createZeroTrustList(listName, properList, (index + 1), listsToCreate)
-        .then(() => sleep(350)) // Sleep for 350ms between list additions
-        .catch(error => {
-          console.error(`Error creating list ${process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`}`);
-        });
+      try {
+        await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
+        await sleep(350); // Sleep for 350ms between list additions
+      } catch (error) {
+        console.error(`Error creating list ${process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`}`);
+      }
     }
-  })
-  .catch(error => {
+  } catch (error) {
     console.error('Error fetching data from the provided URL:', error);
-  });
+  }
+}
 
 function trimArray(arr, size) {
   return arr.slice(0, size);
@@ -62,8 +64,8 @@ function chunkArray(array, chunkSize) {
   return chunks;
 }
 
-function createZeroTrustList(name, items, currentItem, totalItems) {
-  return axios.post(
+async function createZeroTrustList(name, items, currentItem, totalItems) {
+  const response = await axios.post(
     `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
     {
       name,
@@ -78,13 +80,14 @@ function createZeroTrustList(name, items, currentItem, totalItems) {
         'X-Auth-Key': API_TOKEN,
       },
     }
-  )
-    .then(response => {
-      const listId = response.data.result.id;
-      console.log(`Created Zero Trust list ${process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left"`);
-    });
+  );
+
+  const listId = response.data.result.id;
+  console.log(`Created Zero Trust list ${process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left"`);
 }
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+runScript();
