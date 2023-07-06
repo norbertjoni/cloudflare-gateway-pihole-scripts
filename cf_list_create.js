@@ -39,12 +39,11 @@ axios.get('https://big.oisd.nl/regex')
 
       let properList = chunk.map(domain => ({ value: domain }));
 
-      try {
-        await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
-        await sleep(350); // Sleep for 350ms between list additions
-      } catch (error) {
-        console.error(`Error creating list ${process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`}`);
-      }
+      createZeroTrustList(listName, properList, (index + 1), listsToCreate)
+        .then(() => sleep(350)) // Sleep for 350ms between list additions
+        .catch(error => {
+          console.error(`Error creating list ${process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`}`);
+        });
     }
   })
   .catch(error => {
@@ -63,8 +62,8 @@ function chunkArray(array, chunkSize) {
   return chunks;
 }
 
-async function createZeroTrustList(name, items, currentItem, totalItems) {
-  const response = await axios.post(
+function createZeroTrustList(name, items, currentItem, totalItems) {
+  return axios.post(
     `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
     {
       name,
@@ -79,8 +78,13 @@ async function createZeroTrustList(name, items, currentItem, totalItems) {
         'X-Auth-Key': API_TOKEN,
       },
     }
-  );
+  )
+    .then(response => {
+      const listId = response.data.result.id;
+      console.log(`Created Zero Trust list ${process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left"`);
+    });
+}
 
-  const listId = response.data.result.id;
-  console.log(`Created Zero Trust list ${process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left"}`);
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
