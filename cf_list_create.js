@@ -1,55 +1,61 @@
-require("dotenv").config();
-const axios = require('axios');
 const fs = require('fs');
+const axios = require('axios');
 
 const API_TOKEN = process.env.CLOUDFLARE_API_KEY;
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const ACCOUNT_EMAIL = process.env.CLOUDFLARE_ACCOUNT_EMAIL;
+const LIST_ITEM_LIMIT = Number.isSafeInteger(Number(process.env.CLOUDFLARE_LIST_ITEM_LIMIT)) ? Number(process.env.CLOUDFLARE_LIST_ITEM_LIMIT) : 300000;
 
-async function createZeroTrustList(name, items) {
-  try {
-    const response = await axios.post(
-      `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
-      {
-        name,
-        type: 'DOMAIN', // Set list type to DOMAIN
-        items,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-Auth-Email': ACCOUNT_EMAIL,
-          'X-Auth-Key': API_TOKEN,
-        },
-      }
-    );
-
-    const listId = response.data.result.id;
-    console.log(`Created Zero Trust list "${name}" with ID ${listId}`);
-  } catch (error) {
-    console.error(`Error creating list "${name}": ${error.response.data}`);
-  }
+if (!process.env.CI) {
+  console.log(`List item limit set to ${LIST_ITEM_LIMIT}`);
 }
 
-async function processInputFile(inputFilePath) {
-  const fileContent = fs.readFileSync(inputFilePath, 'utf8');
+// Fetch data from the provided URL
+axios.get('https://big.oisd.nl/regex')
+  .then(response => {
+    const data = response.data;
 
-  const lines = fileContent.split('\n');
-  const regexLines = lines.filter(line => line.startsWith('/') && line.endsWith('/'));
+    // Remove lines starting with "#"
+    let lines = data.split('\n').filter(line => !line.trim().startsWith('#'));
 
-  const listsToCreate = Math.ceil(regexLines.length / 1000);
+    // Convert into array without any modification
+    let domains = lines.filter(line => line.trim() !== '');
 
-  console.log(`Found ${regexLines.length} valid domain patterns in the input file - ${listsToCreate} list(s) will be created`);
+    // Trim array to 300,000 domains if it's longer than that
+    if (domains.length > LIST_ITEM_LIMIT) {
+      domains = trimArray(domains, LIST_ITEM_LIMIT);
+      console.warn(`More than ${LIST_ITEM_LIMIT} domains found in input - input has to be trimmed`);
+    }
 
-  const chunks = chunkArray(regexLines, 1000);
+    const listsToCreate = Math.ceil(domains.length / 1000);
 
-  for (const [index, chunk] of chunks.entries()) {
-    const listName = `CGPS List - Chunk ${index}`;
-    const items = chunk.map(line => ({ value: line.substring(1, line.length - 1), is_regex: true }));
+    if (!process.env.CI) {
+      console.log(`Found ${domains.length} valid domains in input - ${listsToCreate} list(s) will be created`);
+    }
 
-    await createZeroTrustList(listName, items);
-  }
+    // Separate domains into chunks of 1000 (Cloudflare list cap)
+    const chunks = chunkArray(domains, 1000);
+
+    // Create Cloudflare Zero Trust lists
+    for (const [index, chunk] of chunks.entries()) {
+      const listName = `CGPS List - Chunk ${index}`;
+
+      let properList = chunk.map(domain => ({ value: domain }));
+
+      try {
+        await createZeroTrustList(listName, properList, (index + 1), listsToCreate);
+        await sleep(350); // Sleep for 350ms between list additions
+      } catch (error) {
+        console.error(`Error creating list ${process.env.CI ? "(redacted on CI)" : `"${listName}": ${error.response.data}`}`);
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error fetching data from the provided URL:', error);
+  });
+
+function trimArray(arr, size) {
+  return arr.slice(0, size);
 }
 
 function chunkArray(array, chunkSize) {
@@ -60,5 +66,24 @@ function chunkArray(array, chunkSize) {
   return chunks;
 }
 
-const inputFilePath = 'input.csv';
-processInputFile(inputFilePath);
+async function createZeroTrustList(name, items, currentItem, totalItems) {
+  const response = await axios.post(
+    `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/gateway/lists`,
+    {
+      name,
+      type: 'DOMAIN',
+      items,
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${API_TOKEN}`,
+        'Content-Type': 'application/json',
+        'X-Auth-Email': ACCOUNT_EMAIL,
+        'X-Auth-Key': API_TOKEN,
+      },
+    }
+  );
+
+  const listId = response.data.result.id;
+  console.log(`Created Zero Trust list ${process.env.CI ? "(redacted on CI)" : `"${name}" with ID ${listId} - ${totalItems - currentItem} left"}`);
+}
