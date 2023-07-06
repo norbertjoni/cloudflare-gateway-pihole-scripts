@@ -16,10 +16,7 @@ axios.get('https://big.oisd.nl/regex')
     const data = response.data;
 
     // Remove lines starting with "#"
-    let lines = data.split('\n').filter(line => !line.trim().startsWith('#'));
-
-    // Convert into array without any modification
-    let domains = lines.filter(line => line.trim() !== '');
+    let domains = data.split('\n').filter(line => !line.trim().startsWith('#'));
 
     // Trim array to 300,000 domains if it's longer than that
     if (domains.length > LIST_ITEM_LIMIT) {
